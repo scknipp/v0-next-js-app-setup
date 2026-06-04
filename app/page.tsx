@@ -1,37 +1,223 @@
-export default function Page() {
-  return (
-    <main className="flex min-h-screen items-center justify-center bg-black px-6 text-neutral-400">
-      <div className="flex w-full max-w-md flex-col items-start gap-8">
-        <svg
-          fill="currentColor"
-          viewBox="0 0 147 70"
-          xmlns="http://www.w3.org/2000/svg"
-          aria-hidden="true"
-          className="size-10 text-white"
-        >
-          <path d="M56 50.2031V14H70V60.1562C70 65.5928 65.5928 70 60.1562 70C57.5605 70 54.9982 68.9992 53.1562 67.1573L0 14H19.7969L56 50.2031Z" />
-          <path d="M147 56H133V23.9531L100.953 56H133V70H96.6875C85.8144 70 77 61.1856 77 50.3125V14H91V46.1562L123.156 14H91V0H127.312C138.186 0 147 8.81439 147 19.6875V56Z" />
-        </svg>
+'use client';
 
-        <div className="space-y-3">
-          <h1 className="text-balance text-2xl font-semibold tracking-tight text-white">
-            To get started, describe what you want to build.
-          </h1>
-          <p className="text-pretty text-sm leading-relaxed text-neutral-500">
-            This is the default page for a fresh v0 project. Open the prompt and
-            tell v0 what to create, or browse the{' '}
-            <a
-              href="https://v0.app/templates"
-              target="_blank"
-              rel="noreferrer"
-              className="text-neutral-300 underline underline-offset-4 hover:text-white"
-            >
-              Community
-            </a>{' '}
-            for inspiration.
-          </p>
+import { useState } from 'react';
+
+export default function TexasGlobalInvestments() {
+  const [activePage, setActivePage] = useState('stocks');
+
+  const menuItems = [
+    { id: 'stocks', label: 'Stocks' },
+    { id: 'charts', label: 'Charts' },
+    { id: 'screener', label: 'Stock Screener' },
+    { id: 'lists', label: 'Stock Lists' },
+    { id: 'backtester', label: 'Back Tester' },
+    { id: 'papertrading', label: 'Paper Trading' },
+  ];
+
+  const toolItems = [
+    { id: 'markets', label: 'Markets' },
+    { id: 'options', label: 'Options' },
+    { id: 'forex', label: 'Forex' },
+    { id: 'crypto', label: 'Crypto' },
+    { id: 'metals', label: 'Metals' },
+    { id: 'library', label: 'Library' },
+    { id: 'games', label: 'Games' },
+    { id: 'chapel', label: 'Chapel' },
+  ];
+
+  return (
+    <div className="h-screen flex flex-col bg-[#0d2747] text-white overflow-hidden">
+      {/* Top Banner */}
+      <div className="h-16 border-b-2 border-[#4a240b] bg-[#0d2747] flex items-center justify-center relative">
+        <h1 
+          className="text-3xl font-bold tracking-[6px] text-[#FFD43B]"
+        >
+          TEXAS GLOBAL INVESTMENTS
+        </h1>
+      </div>
+
+      {/* Main Layout */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Sidebar - MENU */}
+        <div className="w-1/6 bg-[#0d2747] border-r border-[#4a240b] p-4 overflow-y-auto">
+          <div className="text-[#FFD43B] font-bold text-sm tracking-widest mb-4 pl-2">MENU</div>
+          <div className="space-y-2">
+            {menuItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActivePage(item.id)}
+                className={`w-full text-left px-4 py-3 rounded-md border border-[#4a240b] text-[#FFD43B] font-medium transition-all
+                  ${activePage === item.id 
+                    ? 'bg-[#8b4513] shadow-inner' 
+                    : 'bg-[#6b3410] hover:bg-[#7a3e12]'}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Center Content Area - White Background */}
+        <div className="flex-1 bg-white text-black overflow-y-auto p-8">
+          {activePage === 'stocks' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Stocks</h2>
+              <p className="text-lg text-gray-700">Stock lookup and research view will go here.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Stocks View - Coming Soon with Search + Chart ]
+              </div>
+            </div>
+          )}
+
+          {activePage === 'charts' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Charts</h2>
+              <div className="p-8 border border-gray-300 rounded-xl text-center text-gray-500 h-96 flex items-center justify-center">
+                Advanced Charting Area
+              </div>
+            </div>
+          )}
+
+          {activePage === 'screener' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Stock Screener</h2>
+              <p className="text-lg text-gray-700">Filter and screen stocks based on your criteria.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Stock Screener - Coming Soon ]
+              </div>
+            </div>
+          )}
+
+          {activePage === 'lists' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Stock Lists</h2>
+              <p className="text-lg text-gray-700">Manage your watchlists and stock collections.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Stock Lists - Coming Soon ]
+              </div>
+            </div>
+          )}
+
+          {activePage === 'backtester' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Back Tester</h2>
+              <p className="text-lg text-gray-700">Test your trading strategies against historical data.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Back Tester - Coming Soon ]
+              </div>
+            </div>
+          )}
+
+          {activePage === 'papertrading' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Paper Trading</h2>
+              <p className="text-lg text-gray-700">Practice trading with virtual money.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Paper Trading - Coming Soon ]
+              </div>
+            </div>
+          )}
+
+          {activePage === 'markets' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Markets</h2>
+              <p className="text-lg text-gray-700">Overview of global market conditions.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Markets Overview - Coming Soon ]
+              </div>
+            </div>
+          )}
+
+          {activePage === 'options' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Options</h2>
+              <p className="text-lg text-gray-700">Options trading and analysis tools.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Options - Coming Soon ]
+              </div>
+            </div>
+          )}
+
+          {activePage === 'forex' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Forex</h2>
+              <p className="text-lg text-gray-700">Foreign exchange market data and trading.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Forex - Coming Soon ]
+              </div>
+            </div>
+          )}
+
+          {activePage === 'crypto' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Crypto</h2>
+              <p className="text-lg text-gray-700">Cryptocurrency market data and analysis.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Crypto - Coming Soon ]
+              </div>
+            </div>
+          )}
+
+          {activePage === 'metals' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Metals</h2>
+              <p className="text-lg text-gray-700">Precious metals market data.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Metals - Coming Soon ]
+              </div>
+            </div>
+          )}
+
+          {activePage === 'library' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Library</h2>
+              <p className="text-lg text-gray-700">Educational resources and documentation.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Library - Coming Soon ]
+              </div>
+            </div>
+          )}
+
+          {activePage === 'games' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Games</h2>
+              <p className="text-lg text-gray-700">Trading simulation games.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Games - Coming Soon ]
+              </div>
+            </div>
+          )}
+
+          {activePage === 'chapel' && (
+            <div>
+              <h2 className="text-3xl font-bold mb-6 text-black">Chapel</h2>
+              <p className="text-lg text-gray-700">A place for reflection and inspiration.</p>
+              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
+                [ Chapel - Coming Soon ]
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right Sidebar - TOOLS */}
+        <div className="w-1/6 bg-[#0d2747] border-l border-[#4a240b] p-4 overflow-y-auto">
+          <div className="text-[#FFD43B] font-bold text-sm tracking-widest mb-4 pl-2">TOOLS</div>
+          <div className="space-y-2">
+            {toolItems.map((item) => (
+              <button
+                key={item.id}
+                onClick={() => setActivePage(item.id)}
+                className={`w-full text-left px-4 py-3 rounded-md border border-[#4a240b] text-[#FFD43B] font-medium transition-all
+                  ${activePage === item.id 
+                    ? 'bg-[#8b4513] shadow-inner' 
+                    : 'bg-[#6b3410] hover:bg-[#7a3e12]'}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
-    </main>
-  )
+    </div>
+  );
 }

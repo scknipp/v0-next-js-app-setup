@@ -10,8 +10,8 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'Texas Global Investments',
+  description: 'Professional trading and investment platform with stocks, charts, options, forex, crypto, and more.',
   generator: 'v0.app',
   icons: {
     icon: [
