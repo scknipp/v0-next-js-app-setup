@@ -1,222 +1,279 @@
 'use client';
 
 import { useState } from 'react';
+import {
+  TrendingUp,
+  LineChart,
+  Filter,
+  List,
+  History,
+  FileText,
+  Globe,
+  Settings2,
+  DollarSign,
+  Bitcoin,
+  Gem,
+  BookOpen,
+  Gamepad2,
+  Church,
+  ChevronRight,
+} from 'lucide-react';
 
 export default function TexasGlobalInvestments() {
   const [activePage, setActivePage] = useState('stocks');
 
   const menuItems = [
-    { id: 'stocks', label: 'Stocks' },
-    { id: 'charts', label: 'Charts' },
-    { id: 'screener', label: 'Stock Screener' },
-    { id: 'lists', label: 'Stock Lists' },
-    { id: 'backtester', label: 'Back Tester' },
-    { id: 'papertrading', label: 'Paper Trading' },
+    { id: 'stocks', label: 'Stocks', icon: TrendingUp },
+    { id: 'charts', label: 'Charts', icon: LineChart },
+    { id: 'screener', label: 'Stock Screener', icon: Filter },
+    { id: 'lists', label: 'Stock Lists', icon: List },
+    { id: 'backtester', label: 'Back Tester', icon: History },
+    { id: 'papertrading', label: 'Paper Trading', icon: FileText },
   ];
 
   const toolItems = [
-    { id: 'markets', label: 'Markets' },
-    { id: 'options', label: 'Options' },
-    { id: 'forex', label: 'Forex' },
-    { id: 'crypto', label: 'Crypto' },
-    { id: 'metals', label: 'Metals' },
-    { id: 'library', label: 'Library' },
-    { id: 'games', label: 'Games' },
-    { id: 'chapel', label: 'Chapel' },
+    { id: 'markets', label: 'Markets', icon: Globe },
+    { id: 'options', label: 'Options', icon: Settings2 },
+    { id: 'forex', label: 'Forex', icon: DollarSign },
+    { id: 'crypto', label: 'Crypto', icon: Bitcoin },
+    { id: 'metals', label: 'Metals', icon: Gem },
+    { id: 'library', label: 'Library', icon: BookOpen },
+    { id: 'games', label: 'Games', icon: Gamepad2 },
+    { id: 'chapel', label: 'Chapel', icon: Church },
   ];
 
-  return (
-    <div className="h-screen flex flex-col bg-[#0d2747] text-white overflow-hidden">
-      {/* Top Banner */}
-      <div className="h-16 border-b-2 border-[#4a240b] bg-[#0d2747] flex items-center justify-center relative">
-        <h1 
-          className="text-3xl font-bold tracking-[6px] text-[#FFD43B]"
-        >
-          TEXAS GLOBAL INVESTMENTS
-        </h1>
+  const renderContent = () => {
+    const pageContent: Record<string, { title: string; description: string; placeholder: string }> = {
+      stocks: {
+        title: 'Stocks',
+        description: 'Research and analyze stocks with real-time data and comprehensive metrics.',
+        placeholder: 'Stock Research Dashboard',
+      },
+      charts: {
+        title: 'Charts',
+        description: 'Advanced technical analysis with customizable charting tools.',
+        placeholder: 'Advanced Charting Suite',
+      },
+      screener: {
+        title: 'Stock Screener',
+        description: 'Filter and discover stocks based on your custom criteria.',
+        placeholder: 'Custom Stock Screener',
+      },
+      lists: {
+        title: 'Stock Lists',
+        description: 'Organize and manage your watchlists and portfolios.',
+        placeholder: 'Watchlist Manager',
+      },
+      backtester: {
+        title: 'Back Tester',
+        description: 'Test trading strategies against historical market data.',
+        placeholder: 'Strategy Backtester',
+      },
+      papertrading: {
+        title: 'Paper Trading',
+        description: 'Practice trading with simulated funds in real market conditions.',
+        placeholder: 'Paper Trading Simulator',
+      },
+      markets: {
+        title: 'Markets',
+        description: 'Global market overview with live indices and economic data.',
+        placeholder: 'Global Markets Dashboard',
+      },
+      options: {
+        title: 'Options',
+        description: 'Options chains, Greeks, and strategy builders.',
+        placeholder: 'Options Trading Center',
+      },
+      forex: {
+        title: 'Forex',
+        description: 'Currency pairs, exchange rates, and FX analysis tools.',
+        placeholder: 'Forex Trading Hub',
+      },
+      crypto: {
+        title: 'Crypto',
+        description: 'Cryptocurrency prices, charts, and market analysis.',
+        placeholder: 'Crypto Market Center',
+      },
+      metals: {
+        title: 'Metals',
+        description: 'Precious metals pricing, trends, and investment analysis.',
+        placeholder: 'Precious Metals Tracker',
+      },
+      library: {
+        title: 'Library',
+        description: 'Educational resources, tutorials, and market research.',
+        placeholder: 'Learning Center',
+      },
+      games: {
+        title: 'Games',
+        description: 'Trading simulations and educational finance games.',
+        placeholder: 'Trading Games',
+      },
+      chapel: {
+        title: 'Chapel',
+        description: 'A space for reflection, inspiration, and mindful trading.',
+        placeholder: 'Reflection Space',
+      },
+    };
+
+    const content = pageContent[activePage] || pageContent.stocks;
+
+    return (
+      <div className="h-full flex flex-col">
+        {/* Page Header */}
+        <div className="mb-8">
+          <h2 className="text-3xl font-bold tracking-tight text-navy-dark mb-2">
+            {content.title}
+          </h2>
+          <p className="text-gray-600 text-lg leading-relaxed">
+            {content.description}
+          </p>
+        </div>
+
+        {/* Content Card */}
+        <div className="flex-1 bg-gray-50 border border-gray-200 rounded-xl p-8 flex flex-col">
+          {/* Stats Row */}
+          <div className="grid grid-cols-4 gap-4 mb-8">
+            {[
+              { label: 'Total Value', value: '$124,523.45', change: '+2.4%' },
+              { label: 'Day Change', value: '+$1,234.56', change: '+1.2%' },
+              { label: 'Open Positions', value: '12', change: '' },
+              { label: 'Watchlist', value: '28', change: '' },
+            ].map((stat, index) => (
+              <div
+                key={index}
+                className="bg-white rounded-lg p-4 border border-gray-100 shadow-sm"
+              >
+                <p className="text-sm text-gray-500 mb-1">{stat.label}</p>
+                <p className="text-xl font-semibold text-[#0a1f3c]">{stat.value}</p>
+                {stat.change && (
+                  <p className="text-sm text-emerald-600 font-medium">{stat.change}</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Main Content Area */}
+          <div className="flex-1 bg-white rounded-lg border border-gray-200 flex items-center justify-center">
+            <div className="text-center">
+              <div className="w-16 h-16 bg-[#0a1f3c]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                <LineChart className="w-8 h-8 text-[#0a1f3c]" />
+              </div>
+              <p className="text-gray-400 text-lg font-medium">{content.placeholder}</p>
+              <p className="text-gray-300 text-sm mt-1">Coming Soon</p>
+            </div>
+          </div>
+        </div>
       </div>
+    );
+  };
+
+  return (
+    <div className="h-screen flex flex-col bg-[#0a1f3c] text-white overflow-hidden">
+      {/* Top Banner */}
+      <header className="h-20 bg-gradient-to-r from-[#061528] via-[#0a1f3c] to-[#061528] border-b border-[#1e4060] flex items-center justify-center relative">
+        {/* Decorative Lines */}
+        <div className="absolute left-0 right-0 top-0 h-px bg-gradient-to-r from-transparent via-[#c9a227]/30 to-transparent" />
+        <div className="absolute left-0 right-0 bottom-0 h-px bg-gradient-to-r from-transparent via-[#c9a227]/20 to-transparent" />
+        
+        {/* Logo Container */}
+        <div className="flex items-center gap-4">
+          {/* Icon/Emblem */}
+          <div className="w-10 h-10 border-2 border-[#c9a227] rounded flex items-center justify-center">
+            <TrendingUp className="w-5 h-5 text-[#c9a227]" />
+          </div>
+          
+          {/* Company Name */}
+          <div className="flex flex-col items-center">
+            <h1 className="text-2xl font-bold tracking-[0.3em] text-[#c9a227] uppercase">
+              Texas Global Investments
+            </h1>
+            <p className="text-xs tracking-[0.2em] text-[#c9a227]/60 uppercase mt-0.5">
+              Professional Trading Platform
+            </p>
+          </div>
+        </div>
+      </header>
 
       {/* Main Layout */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left Sidebar - MENU */}
-        <div className="w-1/6 bg-[#0d2747] border-r border-[#4a240b] p-4 overflow-y-auto">
-          <div className="text-[#FFD43B] font-bold text-sm tracking-widest mb-4 pl-2">MENU</div>
-          <div className="space-y-2">
-            {menuItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActivePage(item.id)}
-                className={`w-full text-left px-4 py-3 rounded-md border border-[#4a240b] text-[#FFD43B] font-medium transition-all
-                  ${activePage === item.id 
-                    ? 'bg-[#8b4513] shadow-inner' 
-                    : 'bg-[#6b3410] hover:bg-[#7a3e12]'}`}
-              >
-                {item.label}
-              </button>
-            ))}
+        <aside className="w-56 bg-gradient-to-b from-[#0d2747] to-[#0a1f3c] border-r border-[#1e4060] flex flex-col">
+          {/* Sidebar Header */}
+          <div className="px-5 py-4 border-b border-[#1e4060]/50">
+            <h2 className="text-xs font-semibold tracking-[0.2em] text-[#c9a227] uppercase">
+              Navigation
+            </h2>
           </div>
-        </div>
+          
+          {/* Menu Items */}
+          <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activePage === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActivePage(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-all duration-200 group
+                    ${isActive 
+                      ? 'bg-[#c9a227] text-[#0a1f3c] shadow-lg shadow-[#c9a227]/20' 
+                      : 'text-gray-300 hover:bg-[#1a3a5c] hover:text-white'}`}
+                >
+                  <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-[#0a1f3c]' : 'text-[#c9a227]'}`} />
+                  <span className="flex-1 text-sm">{item.label}</span>
+                  {isActive && <ChevronRight className="w-4 h-4" />}
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
 
-        {/* Center Content Area - White Background */}
-        <div className="flex-1 bg-white text-black overflow-y-auto p-8">
-          {activePage === 'stocks' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Stocks</h2>
-              <p className="text-lg text-gray-700">Stock lookup and research view will go here.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Stocks View - Coming Soon with Search + Chart ]
-              </div>
-            </div>
-          )}
-
-          {activePage === 'charts' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Charts</h2>
-              <div className="p-8 border border-gray-300 rounded-xl text-center text-gray-500 h-96 flex items-center justify-center">
-                Advanced Charting Area
-              </div>
-            </div>
-          )}
-
-          {activePage === 'screener' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Stock Screener</h2>
-              <p className="text-lg text-gray-700">Filter and screen stocks based on your criteria.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Stock Screener - Coming Soon ]
-              </div>
-            </div>
-          )}
-
-          {activePage === 'lists' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Stock Lists</h2>
-              <p className="text-lg text-gray-700">Manage your watchlists and stock collections.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Stock Lists - Coming Soon ]
-              </div>
-            </div>
-          )}
-
-          {activePage === 'backtester' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Back Tester</h2>
-              <p className="text-lg text-gray-700">Test your trading strategies against historical data.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Back Tester - Coming Soon ]
-              </div>
-            </div>
-          )}
-
-          {activePage === 'papertrading' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Paper Trading</h2>
-              <p className="text-lg text-gray-700">Practice trading with virtual money.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Paper Trading - Coming Soon ]
-              </div>
-            </div>
-          )}
-
-          {activePage === 'markets' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Markets</h2>
-              <p className="text-lg text-gray-700">Overview of global market conditions.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Markets Overview - Coming Soon ]
-              </div>
-            </div>
-          )}
-
-          {activePage === 'options' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Options</h2>
-              <p className="text-lg text-gray-700">Options trading and analysis tools.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Options - Coming Soon ]
-              </div>
-            </div>
-          )}
-
-          {activePage === 'forex' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Forex</h2>
-              <p className="text-lg text-gray-700">Foreign exchange market data and trading.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Forex - Coming Soon ]
-              </div>
-            </div>
-          )}
-
-          {activePage === 'crypto' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Crypto</h2>
-              <p className="text-lg text-gray-700">Cryptocurrency market data and analysis.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Crypto - Coming Soon ]
-              </div>
-            </div>
-          )}
-
-          {activePage === 'metals' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Metals</h2>
-              <p className="text-lg text-gray-700">Precious metals market data.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Metals - Coming Soon ]
-              </div>
-            </div>
-          )}
-
-          {activePage === 'library' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Library</h2>
-              <p className="text-lg text-gray-700">Educational resources and documentation.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Library - Coming Soon ]
-              </div>
-            </div>
-          )}
-
-          {activePage === 'games' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Games</h2>
-              <p className="text-lg text-gray-700">Trading simulation games.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Games - Coming Soon ]
-              </div>
-            </div>
-          )}
-
-          {activePage === 'chapel' && (
-            <div>
-              <h2 className="text-3xl font-bold mb-6 text-black">Chapel</h2>
-              <p className="text-lg text-gray-700">A place for reflection and inspiration.</p>
-              <div className="mt-8 p-8 border border-gray-300 rounded-xl text-center text-gray-500">
-                [ Chapel - Coming Soon ]
-              </div>
-            </div>
-          )}
-        </div>
+        {/* Center Content Area */}
+        <main className="flex-1 bg-white overflow-y-auto">
+          <div className="p-8 h-full">
+            {renderContent()}
+          </div>
+        </main>
 
         {/* Right Sidebar - TOOLS */}
-        <div className="w-1/6 bg-[#0d2747] border-l border-[#4a240b] p-4 overflow-y-auto">
-          <div className="text-[#FFD43B] font-bold text-sm tracking-widest mb-4 pl-2">TOOLS</div>
-          <div className="space-y-2">
-            {toolItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => setActivePage(item.id)}
-                className={`w-full text-left px-4 py-3 rounded-md border border-[#4a240b] text-[#FFD43B] font-medium transition-all
-                  ${activePage === item.id 
-                    ? 'bg-[#8b4513] shadow-inner' 
-                    : 'bg-[#6b3410] hover:bg-[#7a3e12]'}`}
-              >
-                {item.label}
-              </button>
-            ))}
+        <aside className="w-56 bg-gradient-to-b from-[#0d2747] to-[#0a1f3c] border-l border-[#1e4060] flex flex-col">
+          {/* Sidebar Header */}
+          <div className="px-5 py-4 border-b border-[#1e4060]/50">
+            <h2 className="text-xs font-semibold tracking-[0.2em] text-[#c9a227] uppercase">
+              Quick Access
+            </h2>
           </div>
-        </div>
+          
+          {/* Tool Items */}
+          <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+            {toolItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activePage === item.id;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => setActivePage(item.id)}
+                  className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-all duration-200 group
+                    ${isActive 
+                      ? 'bg-[#c9a227] text-[#0a1f3c] shadow-lg shadow-[#c9a227]/20' 
+                      : 'text-gray-300 hover:bg-[#1a3a5c] hover:text-white'}`}
+                >
+                  <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-[#0a1f3c]' : 'text-[#c9a227]'}`} />
+                  <span className="flex-1 text-sm">{item.label}</span>
+                  {isActive && <ChevronRight className="w-4 h-4" />}
+                </button>
+              );
+            })}
+          </nav>
+          
+          {/* Footer */}
+          <div className="p-4 border-t border-[#1e4060]/50">
+            <div className="text-center text-xs text-gray-500">
+              <p>v1.0.0</p>
+            </div>
+          </div>
+        </aside>
       </div>
     </div>
   );
