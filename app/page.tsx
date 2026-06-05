@@ -178,9 +178,20 @@ export default function TexasGlobalInvestments() {
         
         {/* Logo Container */}
         <div className="flex items-center gap-4">
-          {/* Icon/Emblem */}
-          <div className="w-10 h-10 border-2 border-[#c9a227] rounded flex items-center justify-center">
-            <TrendingUp className="w-5 h-5 text-[#c9a227]" />
+          {/* Texas Shape Emblem */}
+          <div className="relative w-12 h-12 flex items-center justify-center">
+            <svg 
+              viewBox="0 0 100 100" 
+              className="w-12 h-12 fill-none stroke-[#c9a227]"
+              strokeWidth="2"
+            >
+              {/* Texas outline shape */}
+              <path 
+                d="M 25 10 L 75 10 L 78 15 L 95 35 L 90 45 L 85 55 L 80 70 L 70 80 L 55 90 L 45 85 L 35 90 L 25 80 L 15 65 L 10 45 L 15 25 Z" 
+                fill="rgba(201, 162, 39, 0.1)"
+              />
+            </svg>
+            <TrendingUp className="w-5 h-5 text-[#c9a227] absolute" />
           </div>
           
           {/* Company Name */}
@@ -221,7 +232,7 @@ export default function TexasGlobalInvestments() {
                       : 'text-gray-300 hover:bg-[#1a3a5c] hover:text-white'}`}
                 >
                   <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-[#0a1f3c]' : 'text-[#c9a227]'}`} />
-                  <span className="flex-1 text-sm">{item.label}</span>
+                  <span className="flex-1 text-base">{item.label}</span>
                   {isActive && <ChevronRight className="w-4 h-4" />}
                 </button>
               );
@@ -260,7 +271,7 @@ export default function TexasGlobalInvestments() {
                       : 'text-gray-300 hover:bg-[#1a3a5c] hover:text-white'}`}
                 >
                   <Icon className={`w-5 h-5 flex-shrink-0 ${isActive ? 'text-[#0a1f3c]' : 'text-[#c9a227]'}`} />
-                  <span className="flex-1 text-sm">{item.label}</span>
+                  <span className="flex-1 text-base">{item.label}</span>
                   {isActive && <ChevronRight className="w-4 h-4" />}
                 </button>
               );
