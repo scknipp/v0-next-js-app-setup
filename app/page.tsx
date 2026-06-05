@@ -179,19 +179,21 @@ export default function TexasGlobalInvestments() {
         {/* Logo Container */}
         <div className="flex items-center gap-4">
           {/* Texas Shape Emblem */}
-          <div className="relative w-12 h-12 flex items-center justify-center">
+          <div className="relative w-14 h-14 flex items-center justify-center">
             <svg 
               viewBox="0 0 100 100" 
-              className="w-12 h-12 fill-none stroke-[#c9a227]"
-              strokeWidth="2"
+              className="w-14 h-14"
             >
-              {/* Texas outline shape */}
+              {/* Detailed Texas outline - accurate state shape */}
               <path 
-                d="M 25 10 L 75 10 L 78 15 L 95 35 L 90 45 L 85 55 L 80 70 L 70 80 L 55 90 L 45 85 L 35 90 L 25 80 L 15 65 L 10 45 L 15 25 Z" 
-                fill="rgba(201, 162, 39, 0.1)"
+                d="M 5 5 L 5 35 L 15 35 L 15 5 L 5 5 M 15 5 L 15 35 L 38 35 L 38 15 L 70 15 L 70 25 L 80 25 L 80 30 L 85 35 L 90 42 L 88 50 L 92 55 L 95 62 L 90 70 L 82 72 L 78 80 L 70 85 L 60 90 L 50 95 L 42 92 L 35 88 L 30 82 L 25 78 L 22 70 L 18 65 L 15 55 L 15 35"
+                fill="rgba(201, 162, 39, 0.15)"
+                stroke="#c9a227"
+                strokeWidth="2"
+                strokeLinejoin="round"
               />
             </svg>
-            <TrendingUp className="w-5 h-5 text-[#c9a227] absolute" />
+            <TrendingUp className="w-5 h-5 text-[#c9a227] absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3" />
           </div>
           
           {/* Company Name */}
