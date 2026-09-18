@@ -18,6 +18,7 @@ import {
   Church,
   ChevronRight,
 } from 'lucide-react';
+import { StocksPage } from '@/components/stocks-page';
 
 export default function TexasGlobalInvestments() {
   const [activePage, setActivePage] = useState('stocks');
@@ -43,6 +44,10 @@ export default function TexasGlobalInvestments() {
   ];
 
   const renderContent = () => {
+    if (activePage === 'stocks') {
+      return <StocksPage />;
+    }
+
     const pageContent: Record<string, { title: string; description: string; placeholder: string }> = {
       stocks: {
         title: 'Stocks',
