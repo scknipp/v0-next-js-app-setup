@@ -1,5 +1,5 @@
 # Texas Global Investments Dashboard — Handover
-**Last updated:** October 2, 2026
+**Last updated:** October 6, 2026
 **For:** Claude (in Claude Code or the claude.ai Project)
 **From:** Steve
 
@@ -41,12 +41,15 @@ A custom investment dashboard called **Texas Global Investments**, Bloomberg-ter
    - Widgets use TradingView's **light** theme with an explicit white background (`backgroundColor: '#ffffff'`), and the wrapper boxes use a white background with a light gray border — matching the clean white content area used everywhere else in the app (we tried a dark/navy look first per the original plan, but Steve preferred white to match the rest of the dashboard).
    - Along the way we hit two local-environment snags worth knowing about for next time: (a) files open in an unsaved VS Code tab can get overwritten back onto disk, undoing external edits — always check for a "modified" (dot/M) indicator on a tab before trusting the on-disk file matches what's open; (b) a stray "npm run..." string once got typed directly into `page.tsx`'s open tab instead of the terminal, which threw TypeScript errors (TS1434/TS2304) until the tab was closed with "Don't Save."
    - Stray `pnpm-lock.yaml` deleted by Steve since the project uses npm exclusively.
-6. **Charts section — Stage 1 of 6 built (Oct 2, 2026). The full staged plan is in `CHARTS-BUILD-PROMPT.md`.**
+6. **Charts section — Stages 1–2 of 6 built (Stage 1 Oct 2, Stage 2 Oct 6, 2026). The full staged plan is in `CHARTS-BUILD-PROMPT.md`.**
    - `/charts` is a full-screen page: thin navy frame (`#0d2747`), slim toolbar with a brown/gold **Home** button (back to `/`), a monospace ticker box (Enter loads), and company name / last price / day change. Accepts `?symbol=XXXX` links; remembers the last ticker in localStorage.
    - Chart: daily OHLC bars (dark blue up / red down) on top (~75%), volume bars below (~25%), sharing one date axis; opens showing the last ~1 year.
    - Files: `app/charts/page.tsx`, `components/charts/charts-page.tsx` (page + toolbar), `components/charts/price-chart.tsx` (the chart), `app/api/prices/route.ts` (server route), `lib/charts/tiingo.ts` (Tiingo fetch + cache), `lib/charts/types.ts`.
    - **Data:** Tiingo split-adjusted daily prices, ~6 years (5 to view + 1 so long moving averages start filled in). Key lives in `.env.local` as `TIINGO_API_KEY` (Git ignores `.env*.local`), sent in a request header, server-side only. Responses are cached on disk in `.cache/tiingo/` (one file per ticker per day, also Git-ignored), so each ticker costs at most 2 Tiingo requests a day. Free limits: 50 requests/hour, 1,000/day, 500 different tickers/month, personal use only.
    - Friendly messages for: missing key, bad key, unknown ticker, rate limit, network failure.
+   - **Stage 2 (IBD overlays):** toolbar now has Daily/Weekly, 6M/1Y/2Y/5Y presets, a Log toggle (log scale is the default), and an Indicators menu. On by default: 50/200-day SMAs (10/40-week on weekly; green/orange), 50-day (10-week) average-volume line, and the RS line (stock ÷ SPY, purple) on its own hidden scale in the bottom of the price pane, with small dots on every new 52-week RS high. Off by default: 10/21-day EMAs (daily only), dashed 52-week-high line, candlesticks instead of bars. A crosshair legend (top-left) shows date, O/H/L/C, % change, volume vs. its average, and the active line values; it shows the latest bar when not hovering.
+   - Weekly bars are built from daily bars in our own code (Mon–Fri weeks, dated by the week's last trading day; the current week is partial). SPY loads once per page visit through the same cached `/api/prices` route (~2 extra Tiingo requests/day). If SPY fails, the chart still works and the legend says the RS line is unavailable.
+   - All chart math lives in `lib/charts/indicators.ts` (pure functions, reusable by the Stage 4 analysis engine). Settings + last ticker are saved together in localStorage under `tgi-charts-settings`.
    - Known harmless console noise: leaving the Stocks page within a second or two of opening it makes TradingView's widget script log "Cannot read properties of null (reading 'querySelector')". Pre-existing, not from Charts code.
 
 ## Ground rules for building
@@ -57,4 +60,4 @@ A custom investment dashboard called **Texas Global Investments**, Bloomberg-ter
 - Never assume the state of the project — check the actual files, or ask Steve what he sees on screen, before giving instructions.
 
 ## Next task
-Continue **section by section, top to bottom** through the menu, one section per work session, making each real. **Charts** is in progress: Stage 1 is built. Next is **Stage 2 (IBD overlays)**: moving averages, average-volume line, RS line, Daily/Weekly toggle, log scale, crosshair legend, timeframe presets. See `CHARTS-BUILD-PROMPT.md`, one stage at a time.
+Continue **section by section, top to bottom** through the menu, one section per work session, making each real. **Charts** is in progress: Stage 1 is built. Stages 1–2 are built. Next is **Stage 3 (swing tools)**: trend line, horizontal line, measure tool, delete/clear, trade planner (buy zone, stop, breakout volume target), drawings saved per ticker. See `CHARTS-BUILD-PROMPT.md`, one stage at a time.
