@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   TrendingUp,
   LineChart,
@@ -22,6 +23,13 @@ import { StocksPage } from '@/components/stocks-page';
 
 export default function TexasGlobalInvestments() {
   const [activePage, setActivePage] = useState('stocks');
+  const router = useRouter();
+
+  // Charts has its own full-screen page at /charts; every other item swaps the middle content.
+  const openPage = (id: string) => {
+    if (id === 'charts') router.push('/charts');
+    else setActivePage(id);
+  };
 
   const menuItems = [
     { id: 'stocks', label: 'Stocks', icon: TrendingUp },
@@ -232,7 +240,7 @@ export default function TexasGlobalInvestments() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActivePage(item.id)}
+                  onClick={() => openPage(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-all duration-200 group
                     ${isActive 
                       ? 'bg-[#c9a227] text-[#0a1f3c] shadow-lg shadow-[#c9a227]/20' 
@@ -271,7 +279,7 @@ export default function TexasGlobalInvestments() {
               return (
                 <button
                   key={item.id}
-                  onClick={() => setActivePage(item.id)}
+                  onClick={() => openPage(item.id)}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left font-medium transition-all duration-200 group
                     ${isActive 
                       ? 'bg-[#c9a227] text-[#0a1f3c] shadow-lg shadow-[#c9a227]/20' 
