@@ -6,6 +6,9 @@
 //
 // Stage 2 overlays (IBD-inspired): moving averages, average-volume line, RS line with new-high
 // dots, optional EMAs and 52-week-high line, log scale, and a crosshair legend.
+//
+// Stage 3 swing tools: trend line, horizontal line, measure, and the trade planner. The painting
+// lives in drawings-primitive.ts; this file turns mouse clicks/drags into drawings.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -19,6 +22,7 @@ import {
   LineStyle,
   PriceScaleMode,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type ISeriesMarkersPluginApi,
   type Time,
@@ -35,7 +39,18 @@ import {
   volumes,
   type Point,
 } from '@/lib/charts/indicators';
+import {
+  BREAKOUT_VOLUME_MULTIPLIER,
+  indexAtOrAfter,
+  newDrawingId,
+  PIVOT_ADD,
+  type Anchor,
+  type ChartTool,
+  type Drawing,
+  type TradePlan,
+} from '@/lib/charts/drawings';
 import type { Bar, ChartSettings, RangePreset } from '@/lib/charts/types';
+import { DrawingsPrimitive } from './drawings-primitive';
 
 // IBD-style colors: dark blue for up days, red for down days.
 const UP_COLOR = '#1f3f8f';
@@ -66,6 +81,8 @@ type Series = {
   rsDots: ISeriesMarkersPluginApi<Time>;
   volume: ISeriesApi<'Histogram'>;
   volAvg: ISeriesApi<'Line'>;
+  anchor: ISeriesApi<'Line'>; // invisible; the drawing tools attach to it
+  drawings: DrawingsPrimitive;
 };
 
 // Quiet line style shared by every overlay: no price tag on the axis, no hover dot.
@@ -86,6 +103,9 @@ function rangeStartIndex(bars: Bar[], preset: RangePreset): number {
   return idx === -1 ? 0 : idx;
 }
 
+const round2 = (n: number) => Math.round(n * 100) / 100;
+const PIVOT_SNAP_PX = 8; // when picking a pivot, a click this close to a bar's high snaps to it
+
 const toMap = (points: Point[]) => new Map(points.map((p) => [p.time, p.value]));
 
 function formatVolume(v: number): string {
@@ -99,13 +119,37 @@ type Props = {
   bars: Bar[]; // daily bars for the stock
   spyBars: Bar[] | null; // daily bars for SPY (null if they couldn't load)
   settings: ChartSettings;
+  // Swing tools (Stage 3). The page owns these; the chart reports clicks back through the callbacks.
+  drawings: Drawing[];
+  plan: TradePlan;
+  tool: ChartTool;
+  selectedId: string | null;
+  onAddDrawing: (drawing: Drawing) => void;
+  onSelect: (id: string | null) => void;
+  onSetPivot: (price: number) => void;
 };
 
-export function PriceChart({ bars: dailyBars, spyBars, settings }: Props) {
+export function PriceChart({
+  bars: dailyBars,
+  spyBars,
+  settings,
+  drawings,
+  plan,
+  tool,
+  selectedId,
+  onAddDrawing,
+  onSelect,
+  onSetPivot,
+}: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<Series | null>(null);
+  const volumeTargetRef = useRef<IPriceLine | null>(null);
+  const pendingTrendRef = useRef<Anchor | null>(null); // first click of a trend line
   const [hoverIndex, setHoverIndex] = useState<number | null>(null);
+
+  // The latest tool, bars and callbacks, for the chart's mouse handlers (which are set up once).
+  const live = useRef({ tool, bars: [] as Bar[], onAddDrawing, onSelect, onSetPivot });
 
   const { interval, range, logScale, indicators } = settings;
   const weekly = interval === 'weekly';
@@ -182,6 +226,12 @@ export function PriceChart({ bars: dailyBars, spyBars, settings }: Props) {
     const rs = chart.addSeries(LineSeries, { ...QUIET_LINE, color: COLORS.rs, priceScaleId: 'rs' }, 0);
     rs.priceScale().applyOptions({ scaleMargins: { top: 0.8, bottom: 0.03 } });
 
+    // An invisible line that follows the closes. The drawings attach to it, so they work the
+    // same whether bars or candlesticks are showing.
+    const anchor = chart.addSeries(LineSeries, { ...QUIET_LINE, lineVisible: false }, 0);
+    const drawingsPrimitive = new DrawingsPrimitive();
+    anchor.attachPrimitive(drawingsPrimitive);
+
     const volume = chart.addSeries(
       HistogramSeries,
       { priceFormat: { type: 'volume' }, priceLineVisible: false, lastValueVisible: false },
@@ -200,6 +250,8 @@ export function PriceChart({ bars: dailyBars, spyBars, settings }: Props) {
       rsDots: createSeriesMarkers(rs, []),
       volume,
       volAvg: chart.addSeries(LineSeries, { ...QUIET_LINE, color: COLORS.volAvg, priceFormat: { type: 'volume' } }, 1),
+      anchor,
+      drawings: drawingsPrimitive,
     };
 
     // Split the height roughly 3-to-1 between the price and volume panes.
@@ -211,15 +263,105 @@ export function PriceChart({ bars: dailyBars, spyBars, settings }: Props) {
     // Every series shares the same dates, so the crosshair's position number is the bar's index.
     chart.subscribeCrosshairMove((param) => {
       setHoverIndex(param.point && param.logical !== undefined ? Math.round(param.logical) : null);
+
+      // While drawing a trend line, stretch the faded preview from the first click to the mouse.
+      const start = pendingTrendRef.current;
+      if (start && param.point && param.paneIndex === 0) {
+        const end = toAnchor(param.point.x, param.point.y);
+        if (end) drawingsPrimitive.update({ draft: { id: 'draft', kind: 'trend', a: start, b: end } });
+      }
     });
+
+    // Pixel position in the price pane → the nearest bar's date and the price at that height.
+    const toAnchor = (x: number, y: number): Anchor | null => {
+      const { bars } = live.current;
+      const logical = chart.timeScale().coordinateToLogical(x);
+      const price = anchor.coordinateToPrice(y);
+      if (logical === null || price === null || bars.length === 0) return null;
+      const index = Math.max(0, Math.min(bars.length - 1, Math.round(logical)));
+      return { time: bars[index].time, price };
+    };
+
+    // Clicks: select a drawing, place a horizontal line, set the pivot, or place trend-line points.
+    chart.subscribeClick((param) => {
+      if (!param.point || param.paneIndex !== 0) return;
+      const { x, y } = param.point;
+      const { tool, bars } = live.current;
+
+      if (tool === 'select') {
+        live.current.onSelect(drawingsPrimitive.findDrawingAt(x, y));
+        return;
+      }
+      const point = toAnchor(x, y);
+      if (!point) return;
+
+      if (tool === 'hline') {
+        live.current.onAddDrawing({ id: newDrawingId(), kind: 'hline', price: round2(point.price) });
+      } else if (tool === 'pivot') {
+        // Snap to the bar's high (+10 cents, IBD style) when the click is close to it.
+        const bar = bars[indexAtOrAfter(bars, point.time)];
+        const highY = anchor.priceToCoordinate(bar.high);
+        const nearHigh = highY !== null && Math.abs(highY - y) <= PIVOT_SNAP_PX;
+        live.current.onSetPivot(round2(nearHigh ? bar.high + PIVOT_ADD : point.price));
+      } else if (tool === 'trend') {
+        const start = pendingTrendRef.current;
+        if (!start) {
+          pendingTrendRef.current = point;
+          drawingsPrimitive.update({ draft: { id: 'draft', kind: 'trend', a: point, b: point } });
+        } else {
+          pendingTrendRef.current = null;
+          drawingsPrimitive.update({ draft: null });
+          live.current.onAddDrawing({ id: newDrawingId(), kind: 'trend', a: start, b: point });
+        }
+      }
+    });
+
+    // Measure tool: press, drag, release. (Chart panning is switched off while it's selected.)
+    const container = containerRef.current;
+    const onPointerDown = (e: PointerEvent) => {
+      if (live.current.tool !== 'measure' || e.button !== 0) return;
+      const rect = container.getBoundingClientRect();
+      const local = (ev: PointerEvent) => ({ x: ev.clientX - rect.left, y: ev.clientY - rect.top });
+      const { x, y } = local(e);
+      if (y > chart.panes()[0].getHeight() || x > chart.timeScale().width()) return; // price pane only
+      const start = toAnchor(x, y);
+      if (!start) return;
+
+      let end = start;
+      drawingsPrimitive.update({ draft: { id: 'draft', kind: 'measure', a: start, b: end } });
+      const onMove = (ev: PointerEvent) => {
+        const p = local(ev);
+        const next = toAnchor(p.x, p.y);
+        if (!next) return;
+        end = next;
+        drawingsPrimitive.update({ draft: { id: 'draft', kind: 'measure', a: start, b: end } });
+      };
+      const onUp = () => {
+        window.removeEventListener('pointermove', onMove);
+        window.removeEventListener('pointerup', onUp);
+        drawingsPrimitive.update({ draft: null });
+        if (end.time !== start.time || end.price !== start.price) {
+          live.current.onAddDrawing({ id: newDrawingId(), kind: 'measure', a: start, b: end });
+        }
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp);
+    };
+    container.addEventListener('pointerdown', onPointerDown, true);
 
     chartRef.current = chart;
     return () => {
+      container.removeEventListener('pointerdown', onPointerDown, true);
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      volumeTargetRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    live.current = { tool, bars: derived.bars, onAddDrawing, onSelect, onSetPivot };
+  });
 
   // Draw the data whenever a new ticker loads or Daily/Weekly changes, then zoom to the preset.
   useEffect(() => {
@@ -255,6 +397,7 @@ export function PriceChart({ bars: dailyBars, spyBars, settings }: Props) {
       })),
     );
     s.volAvg.setData(derived.volAvg);
+    s.anchor.setData(closes(bars));
 
     const last = bars.length - 1;
     chart.timeScale().setVisibleLogicalRange({ from: rangeStartIndex(bars, range), to: last + 5 });
@@ -282,6 +425,40 @@ export function PriceChart({ bars: dailyBars, spyBars, settings }: Props) {
     });
   }, [indicators, logScale, weekly]);
 
+  // Hand the drawings to the painter whenever they (or the bars underneath) change.
+  useEffect(() => {
+    seriesRef.current?.drawings.update({ bars: derived.bars, weekly, drawings, selectedId, plan });
+  }, [derived, weekly, drawings, selectedId, plan]);
+
+  // Switching tools cancels any half-finished drawing. The measure tool needs click-and-drag,
+  // so dragging stops panning the chart while it's selected.
+  useEffect(() => {
+    pendingTrendRef.current = null;
+    seriesRef.current?.drawings.update({ draft: null });
+    chartRef.current?.applyOptions({ handleScroll: { pressedMouseMove: tool !== 'measure' } });
+  }, [tool]);
+
+  // Trade planner: a dashed "Breakout vol" line in the volume pane at average volume × 1.4.
+  useEffect(() => {
+    const s = seriesRef.current;
+    if (!s) return;
+    if (volumeTargetRef.current) {
+      s.volume.removePriceLine(volumeTargetRef.current);
+      volumeTargetRef.current = null;
+    }
+    const avg = derived.volAvg[derived.volAvg.length - 1]?.value;
+    if (plan.visible && plan.pivot && avg) {
+      volumeTargetRef.current = s.volume.createPriceLine({
+        price: avg * BREAKOUT_VOLUME_MULTIPLIER,
+        color: '#2f9e44',
+        lineWidth: 1,
+        lineStyle: LineStyle.Dashed,
+        axisLabelVisible: true,
+        title: 'Breakout vol',
+      });
+    }
+  }, [plan, derived]);
+
   // ----- Crosshair legend (top-left): the hovered bar, or the latest bar when not hovering -----
   const { bars } = derived;
   const i = hoverIndex !== null && hoverIndex >= 0 && hoverIndex < bars.length ? hoverIndex : bars.length - 1;
@@ -303,7 +480,7 @@ export function PriceChart({ bars: dailyBars, spyBars, settings }: Props) {
 
   return (
     <div className="absolute inset-0">
-      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={containerRef} className={`absolute inset-0 ${tool === 'select' ? '' : 'cursor-crosshair'}`} />
 
       {bar && (
         <div className="absolute top-1.5 left-2 z-10 pointer-events-none font-mono text-[11px] leading-4 text-gray-700 bg-white/80 rounded px-1">

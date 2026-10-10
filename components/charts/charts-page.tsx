@@ -1,13 +1,25 @@
 'use client';
 
 // The full-screen Charts page: thin navy frame, slim toolbar, and the chart filling the rest.
-// Toolbar (left to right): Home, ticker, Daily/Weekly, timeframe presets, Log, Indicators.
-// Later stages add drawing tools and the Analyze button.
+// Toolbar (left to right): Home, ticker, Daily/Weekly, timeframe presets, Log, drawing tools,
+// trade planner, Indicators. A later stage adds the Analyze button.
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Check, ChevronDown, Home, Loader2 } from 'lucide-react';
+import { Eraser, Home, Loader2, Minus, MousePointer2, Ruler, Trash2, TrendingUp } from 'lucide-react';
 import { PriceChart } from './price-chart';
+import { TradePlanner } from './trade-planner';
+import { ButtonGroup, IndicatorsMenu, ToolbarButton } from './toolbar-controls';
+import {
+  EMPTY_PLAN,
+  loadDrawings,
+  saveDrawings,
+  suggestedPivot,
+  type ChartTool,
+  type Drawing,
+  type TradePlan,
+} from '@/lib/charts/drawings';
+import { sma, volumes } from '@/lib/charts/indicators';
 import type { Bar, ChartSettings, IndicatorToggles, PriceHistory, RangePreset } from '@/lib/charts/types';
 
 const DEFAULT_SYMBOL = 'NVDA';
@@ -27,6 +39,13 @@ const DEFAULT_SETTINGS: ChartSettings = {
     candles: false,
   },
 };
+
+const DRAWING_TOOLS: { tool: ChartTool; label: string; icon: typeof TrendingUp }[] = [
+  { tool: 'select', label: 'Select (click a drawing, then Delete to remove it)', icon: MousePointer2 },
+  { tool: 'trend', label: 'Trend line: click two points', icon: TrendingUp },
+  { tool: 'hline', label: 'Horizontal line: click once (support, resistance, pivot)', icon: Minus },
+  { tool: 'measure', label: 'Measure: click and drag to see % change and length', icon: Ruler },
+];
 
 /** What localStorage holds: the last ticker plus the chart settings. */
 type Saved = { symbol?: string } & Partial<ChartSettings>;
@@ -54,6 +73,9 @@ async function fetchHistory(symbol: string): Promise<PriceHistory> {
   return json as PriceHistory;
 }
 
+/** The drawings and trade plan for one ticker, kept together so they're always saved under the right symbol. */
+type Marks = { symbol: string | null; drawings: Drawing[]; plan: TradePlan };
+
 export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
   const [input, setInput] = useState('');
   const [data, setData] = useState<PriceHistory | null>(null);
@@ -61,6 +83,11 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
   const [settings, setSettings] = useState<ChartSettings>(DEFAULT_SETTINGS);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Swing tools
+  const [marks, setMarks] = useState<Marks>({ symbol: null, drawings: [], plan: EMPTY_PLAN });
+  const [tool, setTool] = useState<ChartTool>('select');
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const loadSymbol = useCallback(async (raw: string) => {
     const symbol = raw.trim().toUpperCase();
@@ -95,6 +122,57 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
     loadSymbol(initialSymbol || saved.symbol || DEFAULT_SYMBOL);
   }, [initialSymbol, loadSymbol]);
 
+  // When a new ticker loads, bring back its saved drawings and trade plan.
+  const symbol = data?.symbol ?? null;
+  useEffect(() => {
+    if (!symbol) return;
+    setMarks({ symbol, ...loadDrawings(symbol) });
+    setSelectedId(null);
+    setTool('select');
+  }, [symbol]);
+
+  // Save drawings whenever they change (under the ticker they belong to).
+  useEffect(() => {
+    if (marks.symbol) saveDrawings(marks.symbol, { drawings: marks.drawings, plan: marks.plan });
+  }, [marks]);
+
+  const addDrawing = useCallback((d: Drawing) => {
+    setMarks((m) => ({ ...m, drawings: [...m.drawings, d] }));
+    setTool('select'); // one drawing per click of a tool, like most charting apps
+  }, []);
+  const setPlan = useCallback((plan: TradePlan) => setMarks((m) => ({ ...m, plan })), []);
+  const setPivot = useCallback((pivot: number) => {
+    setMarks((m) => ({ ...m, plan: { ...m.plan, pivot, visible: true } }));
+    setTool('select');
+  }, []);
+  const deleteSelected = useCallback(() => {
+    if (!selectedId) return;
+    setMarks((m) => ({ ...m, drawings: m.drawings.filter((d) => d.id !== selectedId) }));
+    setSelectedId(null);
+  }, [selectedId]);
+  const clearAll = () => {
+    if (marks.drawings.length === 0) return;
+    if (!window.confirm(`Remove all ${marks.drawings.length} drawing(s) from ${marks.symbol}? (The trade plan stays.)`)) return;
+    setMarks((m) => ({ ...m, drawings: [] }));
+    setSelectedId(null);
+  };
+
+  // Keyboard: Escape cancels the current tool; Delete/Backspace removes the selected drawing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return; // typing, not a shortcut
+      if (e.key === 'Escape') {
+        setTool('select');
+        setSelectedId(null);
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        deleteSelected();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [deleteSelected]);
+
   // Changes are worked out from the latest settings (`prev`), so quick clicks never undo each other.
   const updateSettings = (change: (prev: ChartSettings) => Partial<ChartSettings>) => {
     setSettings((prev) => {
@@ -107,12 +185,18 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
     updateSettings((prev) => ({ indicators: { ...prev.indicators, [key]: !prev.indicators[key] } }));
 
   // Last price and the change from the prior day's close.
-  const bars = data?.bars ?? [];
+  const bars = useMemo(() => data?.bars ?? [], [data]);
   const last = bars[bars.length - 1];
   const prev = bars[bars.length - 2];
   const change = last && prev ? last.close - prev.close : 0;
   const changePct = last && prev ? (change / prev.close) * 100 : 0;
   const weekly = settings.interval === 'weekly';
+
+  // Numbers the trade planner needs (always from daily bars).
+  const plannerInputs = useMemo(() => {
+    const avg = sma(volumes(bars), 50);
+    return { suggested: suggestedPivot(bars), avgVolume50: avg[avg.length - 1]?.value ?? null };
+  }, [bars]);
 
   return (
     <div className="h-screen w-screen bg-[#0d2747] p-[7px] flex flex-col overflow-hidden">
@@ -145,7 +229,7 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
 
         {data && last && (
           <div className="flex items-baseline gap-2 text-xs min-w-0">
-            <span className="text-gray-300 truncate max-w-[16rem]">{data.name}</span>
+            <span className="text-gray-300 truncate max-w-[14rem]">{data.name}</span>
             <span className="font-mono text-white">{last.close.toFixed(2)}</span>
             <span className={`font-mono whitespace-nowrap ${change >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
               {change >= 0 ? '+' : ''}
@@ -185,13 +269,63 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
             </ToolbarButton>
           </ButtonGroup>
 
+          {/* Drawing tools */}
+          <ButtonGroup>
+            {DRAWING_TOOLS.map(({ tool: t, label, icon: Icon }) => (
+              <ToolbarButton key={t} active={tool === t} onClick={() => setTool(t)} title={label}>
+                <Icon className="w-3.5 h-3.5" />
+              </ToolbarButton>
+            ))}
+          </ButtonGroup>
+          <ButtonGroup>
+            <ToolbarButton disabled={!selectedId} onClick={deleteSelected} title="Delete the selected drawing (Delete key)">
+              <Trash2 className="w-3.5 h-3.5" />
+            </ToolbarButton>
+            <ToolbarButton disabled={marks.drawings.length === 0} onClick={clearAll} title="Clear all drawings for this ticker">
+              <Eraser className="w-3.5 h-3.5" />
+            </ToolbarButton>
+          </ButtonGroup>
+
+          <TradePlanner
+            plan={marks.plan}
+            onChange={setPlan}
+            suggestedPivot={plannerInputs.suggested}
+            avgVolume50={plannerInputs.avgVolume50}
+            lastClose={last?.close ?? null}
+            onPickOnChart={() => setTool('pivot')}
+          />
+
           <IndicatorsMenu indicators={settings.indicators} weekly={weekly} onToggle={toggleIndicator} />
         </div>
       </div>
 
       {/* Chart area */}
       <div className="relative flex-1 min-h-0 bg-white">
-        {data && <PriceChart bars={data.bars} spyBars={spyBars} settings={settings} />}
+        {data && (
+          <PriceChart
+            bars={data.bars}
+            spyBars={spyBars}
+            settings={settings}
+            drawings={marks.drawings}
+            plan={marks.plan}
+            tool={tool}
+            selectedId={selectedId}
+            onAddDrawing={addDrawing}
+            onSelect={setSelectedId}
+            onSetPivot={setPivot}
+          />
+        )}
+
+        {/* A one-line hint while a tool is waiting for clicks */}
+        {tool !== 'select' && (
+          <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 pointer-events-none rounded bg-[#0d2747]/90 px-3 py-1 text-xs text-white">
+            {tool === 'trend' && 'Click the first point, then the second point.'}
+            {tool === 'hline' && 'Click the price level for the line.'}
+            {tool === 'measure' && 'Click and drag from one point to another.'}
+            {tool === 'pivot' && "Click the pivot. Clicking near a bar's high uses that high + 10¢."}
+            <span className="text-gray-400"> · Esc to cancel</span>
+          </div>
+        )}
 
         {error && (
           <div className="absolute inset-0 flex items-center justify-center bg-white/90 z-20">
@@ -204,116 +338,6 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
           </div>
         )}
       </div>
-    </div>
-  );
-}
-
-// ----- Small toolbar pieces -----
-
-function ButtonGroup({ children }: { children: ReactNode }) {
-  return <div className="flex h-7 rounded border border-[#1e4060] overflow-hidden">{children}</div>;
-}
-
-function ToolbarButton({
-  active,
-  onClick,
-  title,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  title?: string;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      aria-pressed={active}
-      className={`px-2.5 text-xs font-medium transition-colors ${
-        active ? 'bg-[#c9a227] text-[#0d2747]' : 'bg-[#061528] text-gray-300 hover:text-white hover:bg-[#123056]'
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-const INDICATOR_ITEMS: { key: keyof IndicatorToggles; label: string; weeklyLabel?: string; dailyOnly?: boolean }[] = [
-  { key: 'movingAverages', label: '50 & 200-day moving averages', weeklyLabel: '10 & 40-week moving averages' },
-  { key: 'rsLine', label: 'RS line (vs. SPY)' },
-  { key: 'ema10', label: '10-day EMA', dailyOnly: true },
-  { key: 'ema21', label: '21-day EMA', dailyOnly: true },
-  { key: 'high52', label: '52-week-high line' },
-  { key: 'candles', label: 'Candlesticks instead of bars' },
-];
-
-function IndicatorsMenu({
-  indicators,
-  weekly,
-  onToggle,
-}: {
-  indicators: IndicatorToggles;
-  weekly: boolean;
-  onToggle: (key: keyof IndicatorToggles) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  // Close the menu when clicking anywhere outside it, or pressing Escape.
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setOpen(false);
-    document.addEventListener('mousedown', onClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onClick);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        className="h-7 px-2.5 flex items-center gap-1 rounded border border-[#1e4060] bg-[#061528] text-xs font-medium text-gray-300 hover:text-white hover:bg-[#123056]"
-      >
-        Indicators
-        <ChevronDown className="w-3.5 h-3.5" />
-      </button>
-
-      {open && (
-        <div className="absolute right-0 top-8 z-30 w-64 rounded border border-gray-200 bg-white py-1 shadow-lg text-gray-800">
-          {INDICATOR_ITEMS.map((item) => {
-            const disabled = item.dailyOnly && weekly;
-            return (
-              <button
-                key={item.key}
-                type="button"
-                disabled={disabled}
-                onClick={() => onToggle(item.key)}
-                className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-gray-50 disabled:text-gray-400 disabled:hover:bg-transparent"
-              >
-                <span
-                  className={`w-3.5 h-3.5 shrink-0 rounded-sm border flex items-center justify-center ${
-                    indicators[item.key] ? 'bg-[#0d2747] border-[#0d2747]' : 'border-gray-300'
-                  }`}
-                >
-                  {indicators[item.key] && <Check className="w-3 h-3 text-white" />}
-                </span>
-                {weekly && item.weeklyLabel ? item.weeklyLabel : item.label}
-                {disabled && <span className="ml-auto text-[10px]">daily only</span>}
-              </button>
-            );
-          })}
-        </div>
-      )}
     </div>
   );
 }
