@@ -27,6 +27,7 @@ export function TradePlanner({
   plan,
   onChange,
   suggestedPivot,
+  suggestedSource,
   avgVolume50,
   lastClose,
   onPickOnChart,
@@ -34,6 +35,7 @@ export function TradePlanner({
   plan: TradePlan;
   onChange: (plan: TradePlan) => void;
   suggestedPivot: number | null;
+  suggestedSource: string; // where the suggestion came from, e.g. "handle high + 10¢"
   avgVolume50: number | null; // 50-day average daily volume
   lastClose: number | null;
   onPickOnChart: () => void;
@@ -95,7 +97,7 @@ export function TradePlanner({
           {suggestedPivot !== null && suggestedPivot !== plan.pivot && (
             <div className="pl-14 text-gray-500">
               Suggested {money(suggestedPivot)}{' '}
-              <span className="text-gray-400">(3-month high + 10¢)</span>{' '}
+              <span className="text-gray-400">({suggestedSource})</span>{' '}
               <button
                 type="button"
                 onClick={() => onChange({ ...plan, pivot: suggestedPivot, visible: true })}

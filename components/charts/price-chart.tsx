@@ -50,6 +50,7 @@ import {
   type TradePlan,
 } from '@/lib/charts/drawings';
 import type { Bar, ChartSettings, RangePreset } from '@/lib/charts/types';
+import type { ChartAnnotation } from '@/lib/charts/analyze';
 import { DrawingsPrimitive } from './drawings-primitive';
 
 // IBD-style colors: dark blue for up days, red for down days.
@@ -83,6 +84,7 @@ type Series = {
   volAvg: ISeriesApi<'Line'>;
   anchor: ISeriesApi<'Line'>; // invisible; the drawing tools attach to it
   drawings: DrawingsPrimitive;
+  annotations: ISeriesMarkersPluginApi<Time>; // analysis markers (base start, base low, handle…)
 };
 
 // Quiet line style shared by every overlay: no price tag on the axis, no hover dot.
@@ -127,6 +129,7 @@ type Props = {
   onAddDrawing: (drawing: Drawing) => void;
   onSelect: (id: string | null) => void;
   onSetPivot: (price: number) => void;
+  annotations: ChartAnnotation[]; // points from the analysis engine to mark on the chart
 };
 
 export function PriceChart({
@@ -140,6 +143,7 @@ export function PriceChart({
   onAddDrawing,
   onSelect,
   onSetPivot,
+  annotations,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -252,6 +256,7 @@ export function PriceChart({
       volAvg: chart.addSeries(LineSeries, { ...QUIET_LINE, color: COLORS.volAvg, priceFormat: { type: 'volume' } }, 1),
       anchor,
       drawings: drawingsPrimitive,
+      annotations: createSeriesMarkers(anchor, []),
     };
 
     // Split the height roughly 3-to-1 between the price and volume panes.
@@ -424,6 +429,28 @@ export function PriceChart({
       scaleMargins: { top: 0.08, bottom: indicators.rsLine ? 0.22 : 0.05 },
     });
   }, [indicators, logScale, weekly]);
+
+  // Analysis markers: small labelled arrows at the base start, base low, handle, etc.
+  // Dates are matched to the bars on screen, so on Weekly a daily date lands on its week.
+  useEffect(() => {
+    const s = seriesRef.current;
+    if (!s) return;
+    const { bars } = derived;
+    if (bars.length === 0) return;
+    s.annotations.setMarkers(
+      annotations
+        .map((a) => ({
+          time: bars[indexAtOrAfter(bars, a.time)].time,
+          position: a.position === 'above' ? ('atPriceTop' as const) : ('atPriceBottom' as const),
+          price: a.price,
+          shape: a.position === 'above' ? ('arrowDown' as const) : ('arrowUp' as const),
+          color: '#6b3410',
+          text: a.text,
+          size: 0.8,
+        }))
+        .sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0)),
+    );
+  }, [annotations, derived]);
 
   // Hand the drawings to the painter whenever they (or the bars underneath) change.
   useEffect(() => {

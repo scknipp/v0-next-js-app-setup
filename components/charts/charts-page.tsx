@@ -6,7 +6,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Eraser, Home, Loader2, Minus, MousePointer2, Ruler, Trash2, TrendingUp } from 'lucide-react';
+import { Eraser, Home, Loader2, Minus, MousePointer2, Ruler, ScanSearch, Trash2, TrendingUp } from 'lucide-react';
+import { AnalysisDrawer } from './analysis-drawer';
 import { PriceChart } from './price-chart';
 import { TradePlanner } from './trade-planner';
 import { ButtonGroup, IndicatorsMenu, ToolbarButton } from './toolbar-controls';
@@ -19,12 +20,14 @@ import {
   type Drawing,
   type TradePlan,
 } from '@/lib/charts/drawings';
-import { sma, volumes } from '@/lib/charts/indicators';
+import { analyzeChart, factsToAnnotations } from '@/lib/charts/analyze';
+import { sma, toWeekly, volumes } from '@/lib/charts/indicators';
 import type { Bar, ChartSettings, IndicatorToggles, PriceHistory, RangePreset } from '@/lib/charts/types';
 
 const DEFAULT_SYMBOL = 'NVDA';
 const STORAGE_KEY = 'tgi-charts-settings';
 const RANGES: RangePreset[] = ['6M', '1Y', '2Y', '5Y'];
+const DRAWER_WIDTH = 360;
 
 const DEFAULT_SETTINGS: ChartSettings = {
   interval: 'daily',
@@ -88,6 +91,10 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
   const [marks, setMarks] = useState<Marks>({ symbol: null, drawings: [], plan: EMPTY_PLAN });
   const [tool, setTool] = useState<ChartTool>('select');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+
+  // Analysis drawer
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [showMarks, setShowMarks] = useState(true);
 
   const loadSymbol = useCallback(async (raw: string) => {
     const symbol = raw.trim().toUpperCase();
@@ -192,11 +199,25 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
   const changePct = last && prev ? (change / prev.close) * 100 : 0;
   const weekly = settings.interval === 'weekly';
 
-  // Numbers the trade planner needs (always from daily bars).
+  // The analysis engine's facts about this chart (always from daily bars; cheap to recompute).
+  const facts = useMemo(
+    () => (data ? analyzeChart(data.symbol, data.bars, toWeekly(data.bars), spyBars) : null),
+    [data, spyBars],
+  );
+  const annotations = useMemo(
+    () => (drawerOpen && showMarks && facts ? factsToAnnotations(facts) : []),
+    [drawerOpen, showMarks, facts],
+  );
+
+  // Numbers the trade planner needs. The suggested pivot comes from the analysis when it found one.
   const plannerInputs = useMemo(() => {
     const avg = sma(volumes(bars), 50);
-    return { suggested: suggestedPivot(bars), avgVolume50: avg[avg.length - 1]?.value ?? null };
-  }, [bars]);
+    return {
+      suggested: facts?.pivot?.price ?? suggestedPivot(bars),
+      suggestedSource: facts?.pivot ? `${facts.pivot.source} + 10¢` : '3-month high + 10¢',
+      avgVolume50: avg[avg.length - 1]?.value ?? null,
+    };
+  }, [bars, facts]);
 
   return (
     <div className="h-screen w-screen bg-[#0d2747] p-[7px] flex flex-col overflow-hidden">
@@ -290,29 +311,56 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
             plan={marks.plan}
             onChange={setPlan}
             suggestedPivot={plannerInputs.suggested}
+            suggestedSource={plannerInputs.suggestedSource}
             avgVolume50={plannerInputs.avgVolume50}
             lastClose={last?.close ?? null}
             onPickOnChart={() => setTool('pivot')}
           />
 
           <IndicatorsMenu indicators={settings.indicators} weekly={weekly} onToggle={toggleIndicator} />
+
+          <button
+            type="button"
+            onClick={() => setDrawerOpen((o) => !o)}
+            aria-pressed={drawerOpen}
+            className={`h-7 px-3 flex items-center gap-1.5 rounded text-xs font-semibold transition-colors ${
+              drawerOpen ? 'bg-[#FFD43B] text-[#0d2747]' : 'bg-[#c9a227] text-[#0d2747] hover:bg-[#FFD43B]'
+            }`}
+          >
+            <ScanSearch className="w-3.5 h-3.5" />
+            Analyze
+          </button>
         </div>
       </div>
 
       {/* Chart area */}
       <div className="relative flex-1 min-h-0 bg-white">
+        {/* The chart narrows while the drawer is open, so the newest bars are never hidden behind it. */}
         {data && (
-          <PriceChart
-            bars={data.bars}
-            spyBars={spyBars}
-            settings={settings}
-            drawings={marks.drawings}
-            plan={marks.plan}
-            tool={tool}
-            selectedId={selectedId}
-            onAddDrawing={addDrawing}
-            onSelect={setSelectedId}
-            onSetPivot={setPivot}
+          <div className="absolute inset-y-0 left-0" style={{ right: drawerOpen ? DRAWER_WIDTH : 0 }}>
+            <PriceChart
+              bars={data.bars}
+              spyBars={spyBars}
+              settings={settings}
+              drawings={marks.drawings}
+              plan={marks.plan}
+              tool={tool}
+              selectedId={selectedId}
+              onAddDrawing={addDrawing}
+              onSelect={setSelectedId}
+              onSetPivot={setPivot}
+              annotations={annotations}
+            />
+          </div>
+        )}
+
+        {drawerOpen && data && (
+          <AnalysisDrawer
+            facts={facts}
+            showMarks={showMarks}
+            onShowMarksChange={setShowMarks}
+            onUsePivot={setPivot}
+            onClose={() => setDrawerOpen(false)}
           />
         )}
 
