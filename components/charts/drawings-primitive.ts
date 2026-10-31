@@ -1,4 +1,4 @@
-// Paints the swing-trading drawings and the trade planner onto the price pane.
+// Paints the swing-trading drawings, the trade planner, and the AI coach's pivot/buy zone onto the price pane.
 // Lightweight Charts has no drawing tools built in; instead it lets us attach a "primitive" —
 // our own painting code that it calls every time the chart redraws (zoom, scroll, resize).
 // Pattern follows the official plugin examples: https://tradingview.github.io/lightweight-charts/plugin-examples/
@@ -17,6 +17,7 @@ import type {
   Time,
 } from 'lightweight-charts';
 import { BUY_ZONE_PCT, EMPTY_PLAN, indexAtOrAfter, planLevels, type Anchor, type Drawing, type TradePlan } from '@/lib/charts/drawings';
+import type { CoachLevels } from '@/lib/charts/coach-marks';
 import type { Bar } from '@/lib/charts/types';
 
 type Target = Parameters<IPrimitivePaneRenderer['draw']>[0];
@@ -30,6 +31,7 @@ export type DrawingsState = {
   selectedId: string | null;
   draft: Drawing | null; // a drawing still being made (shown faded)
   plan: TradePlan;
+  coach: CoachLevels | null; // the AI coach's pivot and buy zone (gold), when shown
 };
 
 const COLORS = {
@@ -40,6 +42,8 @@ const COLORS = {
   pivot: '#2f9e44',
   zone: 'rgba(47, 158, 68, 0.10)',
   stop: '#d0312d',
+  coach: '#a16207', // gold: the AI coach's marks (matches COACH_COLOR)
+  coachZone: 'rgba(201, 162, 39, 0.14)',
 };
 const HIT_DISTANCE = 5; // how close (in pixels) a click must be to select a drawing
 const FONT = '11px ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -104,7 +108,7 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
   private chart: IChartApiBase<Time> | null = null;
   private series: ISeriesApi<SeriesType, Time> | null = null;
   private requestUpdate: (() => void) | null = null;
-  private state: DrawingsState = { bars: [], weekly: false, drawings: [], selectedId: null, draft: null, plan: EMPTY_PLAN };
+  private state: DrawingsState = { bars: [], weekly: false, drawings: [], selectedId: null, draft: null, plan: EMPTY_PLAN, coach: null };
   private readonly view: IPrimitivePaneView = { renderer: () => ({ draw: (target) => this.draw(target) }) };
 
   attached({ chart, series, requestUpdate }: SeriesAttachedParameter<Time>) {
@@ -129,15 +133,16 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     return [this.view];
   }
 
-  // Price tags on the right-hand axis for horizontal lines and the planner's pivot and stop.
+  // Price tags on the right-hand axis for horizontal lines, the planner's pivot and stop, and the coach's pivot.
   priceAxisViews(): ISeriesPrimitiveAxisView[] {
     const tags: { price: number; color: string }[] = [];
     for (const d of this.state.drawings) if (d.kind === 'hline') tags.push({ price: d.price, color: COLORS.hline });
-    const { plan } = this.state;
+    const { plan, coach } = this.state;
     if (plan.visible && plan.pivot) {
       tags.push({ price: plan.pivot, color: COLORS.pivot });
       tags.push({ price: planLevels(plan.pivot, plan.stopPct).stop, color: COLORS.stop });
     }
+    if (coach) tags.push({ price: coach.pivot, color: COLORS.coach });
     return tags.map(({ price, color }) => ({
       coordinate: () => this.y(price) ?? -100,
       text: () => fmt(price),
@@ -146,12 +151,17 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     }));
   }
 
-  // Make sure the whole trade plan (stop to top of buy zone) fits on screen.
+  // Make sure the whole trade plan (stop to top of buy zone) and the coach's buy zone fit on screen.
   autoscaleInfo(): AutoscaleInfo | null {
-    const { plan } = this.state;
-    if (!plan.visible || !plan.pivot) return null;
-    const { zoneTop, stop } = planLevels(plan.pivot, plan.stopPct);
-    return { priceRange: { minValue: stop, maxValue: zoneTop } };
+    const { plan, coach } = this.state;
+    const prices: number[] = [];
+    if (plan.visible && plan.pivot) {
+      const { zoneTop, stop } = planLevels(plan.pivot, plan.stopPct);
+      prices.push(stop, zoneTop);
+    }
+    if (coach) prices.push(coach.pivot, coach.zoneTop);
+    if (prices.length === 0) return null;
+    return { priceRange: { minValue: Math.min(...prices), maxValue: Math.max(...prices) } };
   }
 
   // ----- Converting between date/price and pixels -----
@@ -202,7 +212,8 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     target.useMediaCoordinateSpace(({ context: ctx, mediaSize }) => {
       ctx.save();
       ctx.font = FONT;
-      const { drawings, selectedId, draft, plan } = this.state;
+      const { drawings, selectedId, draft, plan, coach } = this.state;
+      if (coach) this.drawCoach(ctx, coach, mediaSize.width); // underneath, so the planner and drawings stay on top
       if (plan.visible && plan.pivot) this.drawPlan(ctx, plan.pivot, plan.stopPct, mediaSize.width);
       for (const d of drawings) this.drawOne(ctx, d, d.id === selectedId, mediaSize.width);
       if (draft) {
@@ -231,6 +242,29 @@ export class DrawingsPrimitive implements ISeriesPrimitive<Time> {
     const right = width - 6;
     label(ctx, `Pivot ${fmt(pivot)} · buy zone to ${fmt(zoneTop)} (+${BUY_ZONE_PCT}%)`, right, yPivot - 10, COLORS.pivot, 'right');
     label(ctx, `Stop ${fmt(stop)} (−${stopPct.toFixed(1)}% risk from pivot)`, right, yStop + 10, COLORS.stop, 'right');
+  }
+
+  /** The coach's pivot line and shaded buy zone, starting at the date the pivot was set. */
+  private drawCoach(ctx: Ctx, coach: CoachLevels, width: number) {
+    const yPivot = this.y(coach.pivot);
+    const yTop = this.y(coach.zoneTop);
+    if (yPivot === null || yTop === null) return;
+    let x0 = 0;
+    if (coach.from && this.chart) {
+      const x = this.chart.timeScale().logicalToCoordinate(indexAtOrAfter(this.state.bars, coach.from) as Logical);
+      if (x !== null) x0 = Math.max(0, Math.min(x, width));
+    }
+
+    ctx.fillStyle = COLORS.coachZone;
+    ctx.fillRect(x0, yTop, width - x0, yPivot - yTop);
+    line(ctx, { x: x0, y: yTop }, { x: width, y: yTop }, COLORS.coach, 1, [2, 3]);
+    line(ctx, { x: x0, y: yPivot }, { x: width, y: yPivot }, COLORS.coach, 1.5);
+
+    // Label just under the pivot line (above the zone it can hit the legend), starting at the pivot
+    // date, or against the right edge if that's too close.
+    const text = `Coach pivot ${fmt(coach.pivot)} · zone to ${fmt(coach.zoneTop)}`;
+    const fitsRight = x0 + ctx.measureText(text).width + 16 < width;
+    label(ctx, text, fitsRight ? x0 + 4 : width - 6, yPivot + 11, COLORS.coach, fitsRight ? 'left' : 'right');
   }
 
   private drawOne(ctx: Ctx, d: Drawing, selected: boolean, width: number) {

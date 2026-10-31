@@ -2,14 +2,15 @@
 
 // The full-screen Charts page: thin navy frame, slim toolbar, and the chart filling the rest.
 // Toolbar (left to right): Home, ticker, Daily/Weekly, timeframe presets, Log, drawing tools,
-// trade planner, Indicators. A later stage adds the Analyze button.
+// trade planner, Indicators, Analyze (opens the drawer with the AI coach and the chart facts).
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Eraser, Home, Loader2, Minus, MousePointer2, Ruler, ScanSearch, Trash2, TrendingUp } from 'lucide-react';
-import { AnalysisDrawer } from './analysis-drawer';
+import { AnalysisDrawer, type DrawerTab } from './analysis-drawer';
 import { PriceChart } from './price-chart';
 import { TradePlanner } from './trade-planner';
+import { useCoach } from './use-coach';
 import { ButtonGroup, IndicatorsMenu, ToolbarButton } from './toolbar-controls';
 import {
   EMPTY_PLAN,
@@ -21,6 +22,7 @@ import {
   type TradePlan,
 } from '@/lib/charts/drawings';
 import { analyzeChart, factsToAnnotations } from '@/lib/charts/analyze';
+import { coachLevels, coachPoints } from '@/lib/charts/coach-marks';
 import { sma, toWeekly, volumes } from '@/lib/charts/indicators';
 import type { Bar, ChartSettings, IndicatorToggles, PriceHistory, RangePreset } from '@/lib/charts/types';
 
@@ -94,7 +96,10 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
 
   // Analysis drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [showMarks, setShowMarks] = useState(true);
+  const [drawerTab, setDrawerTab] = useState<DrawerTab>('coach');
+  const [showMarks, setShowMarks] = useState(true); // engine's marks (Chart facts tab)
+  const [showCoachMarks, setShowCoachMarks] = useState(true); // coach's marks (AI coach tab)
+  const screenshotRef = useRef<(() => string | null) | null>(null); // the chart fills this in
 
   const loadSymbol = useCallback(async (raw: string) => {
     const symbol = raw.trim().toUpperCase();
@@ -137,6 +142,10 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
     setSelectedId(null);
     setTool('select');
   }, [symbol]);
+
+  // AI coach (Stage 5). Today's saved review loads for free; asking Claude happens only on a click.
+  const coach = useCoach(symbol);
+  const runCoach = (reanalyze: boolean) => coach.run(screenshotRef.current?.() ?? null, reanalyze);
 
   // Save drawings whenever they change (under the ticker they belong to).
   useEffect(() => {
@@ -204,9 +213,17 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
     () => (data ? analyzeChart(data.symbol, data.bars, toWeekly(data.bars), spyBars) : null),
     [data, spyBars],
   );
-  const annotations = useMemo(
-    () => (drawerOpen && showMarks && facts ? factsToAnnotations(facts) : []),
-    [drawerOpen, showMarks, facts],
+  // Marks on the chart follow the drawer tab: the coach's (gold) on AI coach, the engine's (brown) on Chart facts.
+  const coachAnalysis = coach.result?.analysis ?? null;
+  const showingCoach = drawerOpen && drawerTab === 'coach' && showCoachMarks && coachAnalysis !== null;
+  const annotations = useMemo(() => {
+    if (!drawerOpen) return [];
+    if (drawerTab === 'coach') return showCoachMarks && coachAnalysis ? coachPoints(coachAnalysis) : [];
+    return showMarks && facts ? factsToAnnotations(facts) : [];
+  }, [drawerOpen, drawerTab, showCoachMarks, showMarks, coachAnalysis, facts]);
+  const coachLevelsShown = useMemo(
+    () => (showingCoach && coachAnalysis ? coachLevels(coachAnalysis) : null),
+    [showingCoach, coachAnalysis],
   );
 
   // Numbers the trade planner needs. The suggested pivot comes from the analysis when it found one.
@@ -350,6 +367,8 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
               onSelect={setSelectedId}
               onSetPivot={setPivot}
               annotations={annotations}
+              coachLevels={coachLevelsShown}
+              screenshotRef={screenshotRef}
             />
           </div>
         )}
@@ -357,6 +376,12 @@ export function ChartsPage({ initialSymbol }: { initialSymbol?: string }) {
         {drawerOpen && data && (
           <AnalysisDrawer
             facts={facts}
+            tab={drawerTab}
+            onTabChange={setDrawerTab}
+            coach={coach}
+            onRunCoach={runCoach}
+            showCoachMarks={showCoachMarks}
+            onShowCoachMarksChange={setShowCoachMarks}
             showMarks={showMarks}
             onShowMarksChange={setShowMarks}
             onUsePivot={setPivot}

@@ -620,7 +620,7 @@ export function analyzeChart(symbol: string, daily: Bar[], weekly: Bar[], spy: B
 }
 
 /** Points worth marking on the chart so the facts can be checked by eye. */
-export type ChartAnnotation = { time: string; price: number; position: 'above' | 'below'; text: string };
+export type ChartAnnotation = { time: string; price: number; position: 'above' | 'below'; text: string; color?: string };
 
 export function factsToAnnotations(facts: ChartFacts): ChartAnnotation[] {
   const out: ChartAnnotation[] = [];

@@ -19,7 +19,7 @@ export class PriceDataError extends Error {
 }
 
 /** Today's date in New York (the market's time zone), e.g. "2026-10-02". */
-function marketDate(): string {
+export function marketDate(): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: 'America/New_York' });
 }
 

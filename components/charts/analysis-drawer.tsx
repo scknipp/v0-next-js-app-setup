@@ -1,11 +1,14 @@
 'use client';
 
-// The right-hand drawer opened by the Analyze button. Stage 4 shows the analysis engine's raw facts
-// as a debug view, so we can sanity-check the numbers against the chart before the AI coach uses them.
+// The right-hand drawer opened by the Analyze button, with two tabs:
+// - AI coach (Stage 5): Claude's review of the chart — see coach-panel.tsx.
+// - Chart facts (Stage 4): the analysis engine's raw numbers as a debug view, to sanity-check them.
 
 import { useState, type ReactNode } from 'react';
 import { Check, Copy, X } from 'lucide-react';
 import type { ChartFacts, Confidence } from '@/lib/charts/analyze';
+import { CoachPanel } from './coach-panel';
+import type { CoachState } from './use-coach';
 
 const money = (n: number | null | undefined) => (n == null ? '—' : `$${n.toFixed(2)}`);
 const signedPct = (n: number | null | undefined) => (n == null ? '—' : `${n >= 0 ? '+' : ''}${n.toFixed(1)}%`);
@@ -18,24 +21,39 @@ function shares(v: number): string {
   return String(v);
 }
 
+export type DrawerTab = 'coach' | 'facts';
+
 export function AnalysisDrawer({
   facts,
+  tab,
+  onTabChange,
+  coach,
+  onRunCoach,
+  showCoachMarks,
+  onShowCoachMarksChange,
   showMarks,
   onShowMarksChange,
   onUsePivot,
   onClose,
 }: {
   facts: ChartFacts | null;
-  showMarks: boolean;
+  tab: DrawerTab;
+  onTabChange: (tab: DrawerTab) => void;
+  coach: CoachState;
+  onRunCoach: (reanalyze: boolean) => void;
+  showCoachMarks: boolean;
+  onShowCoachMarksChange: (show: boolean) => void;
+  showMarks: boolean; // the engine's marks (Chart facts tab)
   onShowMarksChange: (show: boolean) => void;
   onUsePivot: (price: number) => void;
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
+  const copyable = tab === 'coach' ? coach.result : facts; // the JSON button copies what the tab shows
 
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(JSON.stringify(facts, null, 2));
+      await navigator.clipboard.writeText(JSON.stringify(copyable, null, 2));
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -49,17 +67,18 @@ export function AnalysisDrawer({
       <div className="shrink-0 flex items-start gap-2 px-3 py-2 border-b border-gray-200 bg-[#0d2747] text-white">
         <div className="min-w-0 flex-1">
           <div className="text-sm font-semibold">
-            Chart facts {facts && <span className="font-mono text-[#FFD43B]">{facts.symbol}</span>}
+            Analyze {facts && <span className="font-mono text-[#FFD43B]">{facts.symbol}</span>}
           </div>
           <div className="text-[11px] text-gray-300">
-            Debug view · measured by code, no AI yet{facts && ` · as of ${facts.asOf}`}
+            {tab === 'coach' ? 'AI coach · Claude Sonnet 5.5' : 'Debug view · measured by code'}
+            {facts && ` · as of ${facts.asOf}`}
           </div>
         </div>
         <button
           type="button"
           onClick={copy}
-          disabled={!facts}
-          title="Copy the raw facts as JSON"
+          disabled={!copyable}
+          title={tab === 'coach' ? "Copy the coach's review as JSON" : 'Copy the raw facts as JSON'}
           className="h-7 px-2 flex items-center gap-1 rounded text-xs text-gray-200 hover:bg-white/10"
         >
           {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
@@ -70,8 +89,37 @@ export function AnalysisDrawer({
         </button>
       </div>
 
+      {/* Tabs */}
+      <div className="shrink-0 flex border-b border-gray-200 text-xs">
+        {(
+          [
+            ['coach', 'AI coach'],
+            ['facts', 'Chart facts'],
+          ] as const
+        ).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onTabChange(id)}
+            className={`flex-1 h-8 font-medium border-b-2 ${
+              tab === id ? 'border-[#c9a227] text-[#0d2747]' : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       {!facts ? (
         <p className="p-4 text-sm text-gray-500">Not enough price history to analyze this chart.</p>
+      ) : tab === 'coach' ? (
+        <CoachPanel
+          coach={coach}
+          onRun={onRunCoach}
+          onUsePivot={onUsePivot}
+          showMarks={showCoachMarks}
+          onShowMarksChange={onShowCoachMarksChange}
+        />
       ) : (
         <div className="flex-1 overflow-y-auto px-3 py-2 space-y-3 text-xs">
           <label className="flex items-center gap-1.5 text-gray-600">

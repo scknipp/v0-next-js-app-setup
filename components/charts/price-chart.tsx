@@ -10,7 +10,7 @@
 // Stage 3 swing tools: trend line, horizontal line, measure, and the trade planner. The painting
 // lives in drawings-primitive.ts; this file turns mouse clicks/drags into drawings.
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type MutableRefObject } from 'react';
 import {
   BarSeries,
   CandlestickSeries,
@@ -51,6 +51,7 @@ import {
 } from '@/lib/charts/drawings';
 import type { Bar, ChartSettings, RangePreset } from '@/lib/charts/types';
 import type { ChartAnnotation } from '@/lib/charts/analyze';
+import type { CoachLevels } from '@/lib/charts/coach-marks';
 import { DrawingsPrimitive } from './drawings-primitive';
 
 // IBD-style colors: dark blue for up days, red for down days.
@@ -95,6 +96,23 @@ const QUIET_LINE = {
   crosshairMarkerVisible: false,
 } as const;
 
+/** The chart (with drawings and trade plan, no crosshair) as a PNG data URL for the AI coach.
+ *  Scaled down so the long edge is at most 1568px, Claude's standard image size; bigger only costs more. */
+function chartImage(chart: IChartApi): string | null {
+  try {
+    const shot = chart.takeScreenshot(true);
+    const scale = Math.min(1, 1568 / Math.max(shot.width, shot.height));
+    if (scale === 1) return shot.toDataURL('image/png');
+    const out = document.createElement('canvas');
+    out.width = Math.round(shot.width * scale);
+    out.height = Math.round(shot.height * scale);
+    out.getContext('2d')?.drawImage(shot, 0, 0, out.width, out.height);
+    return out.toDataURL('image/png');
+  } catch {
+    return null; // the coach still works from the numbers alone
+  }
+}
+
 /** Index of the first bar on or after a date N months before the last bar. */
 function rangeStartIndex(bars: Bar[], preset: RangePreset): number {
   if (bars.length === 0) return 0;
@@ -129,7 +147,10 @@ type Props = {
   onAddDrawing: (drawing: Drawing) => void;
   onSelect: (id: string | null) => void;
   onSetPivot: (price: number) => void;
-  annotations: ChartAnnotation[]; // points from the analysis engine to mark on the chart
+  annotations: ChartAnnotation[]; // points to mark on the chart (analysis engine or AI coach)
+  coachLevels: CoachLevels | null; // the AI coach's pivot line and buy zone, when shown
+  // Filled in by the chart: call it to get a picture of the chart for the AI coach.
+  screenshotRef?: MutableRefObject<(() => string | null) | null>;
 };
 
 export function PriceChart({
@@ -144,6 +165,8 @@ export function PriceChart({
   onSelect,
   onSetPivot,
   annotations,
+  coachLevels,
+  screenshotRef,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -355,7 +378,9 @@ export function PriceChart({
     container.addEventListener('pointerdown', onPointerDown, true);
 
     chartRef.current = chart;
+    if (screenshotRef) screenshotRef.current = () => chartImage(chart);
     return () => {
+      if (screenshotRef) screenshotRef.current = null;
       container.removeEventListener('pointerdown', onPointerDown, true);
       chart.remove();
       chartRef.current = null;
@@ -430,7 +455,7 @@ export function PriceChart({
     });
   }, [indicators, logScale, weekly]);
 
-  // Analysis markers: small labelled arrows at the base start, base low, handle, etc.
+  // Analysis markers: small labelled arrows at the base start, base low, handle, etc. (engine or coach).
   // Dates are matched to the bars on screen, so on Weekly a daily date lands on its week.
   useEffect(() => {
     const s = seriesRef.current;
@@ -444,7 +469,7 @@ export function PriceChart({
           position: a.position === 'above' ? ('atPriceTop' as const) : ('atPriceBottom' as const),
           price: a.price,
           shape: a.position === 'above' ? ('arrowDown' as const) : ('arrowUp' as const),
-          color: '#6b3410',
+          color: a.color ?? '#6b3410', // engine: brown; coach: gold
           text: a.text,
           size: 0.8,
         }))
@@ -454,8 +479,8 @@ export function PriceChart({
 
   // Hand the drawings to the painter whenever they (or the bars underneath) change.
   useEffect(() => {
-    seriesRef.current?.drawings.update({ bars: derived.bars, weekly, drawings, selectedId, plan });
-  }, [derived, weekly, drawings, selectedId, plan]);
+    seriesRef.current?.drawings.update({ bars: derived.bars, weekly, drawings, selectedId, plan, coach: coachLevels });
+  }, [derived, weekly, drawings, selectedId, plan, coachLevels]);
 
   // Switching tools cancels any half-finished drawing. The measure tool needs click-and-drag,
   // so dragging stops panning the chart while it's selected.

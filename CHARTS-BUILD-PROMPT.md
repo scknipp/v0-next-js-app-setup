@@ -168,7 +168,7 @@ Create an `analyzeChart(daily, weekly, spy)` function that returns JSON with the
 **The server route:** `/api/analyze-chart`.
 
 **Model**
-- Use the current Claude Sonnet model (`claude-sonnet-5` as of this writing). **Verify the model string in Anthropic's docs.**
+- Use the current Claude Sonnet model (`claude-sonnet-5` as of this writing; **`claude-sonnet-5-5` as of Oct 28, 2026**). **Verify the model string in Anthropic's docs.**
 - The key lives in `ANTHROPIC_API_KEY` in `.env.local`. Walk Steve through getting it at console.anthropic.com. It is pay-as-you-go.
 
 **What gets sent**
