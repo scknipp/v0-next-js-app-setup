@@ -7,7 +7,7 @@
 
 ## How to use this doc
 - **In Claude Code:** this file lives in the project folder and is read automatically.
-- **In the claude.ai Project:** the matching copy is `texas_global_investments_handover_v2.md` in Project Knowledge. Keep both in sync when either one changes.
+- **In the claude.ai Project:** the Project holds `CLAUDE.md` and `CHARTS-BUILD-PROMPT.md` directly. Steve replaces those files in the Project after they change.
 
 ---
 

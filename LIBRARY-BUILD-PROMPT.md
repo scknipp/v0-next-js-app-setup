@@ -8,7 +8,7 @@
 
 1. Save this file in your project folder, next to `CLAUDE.md` and `CHARTS-BUILD-PROMPT.md`.
 2. Make sure any Charts adjustments you're working on are finished and committed first, so only one section is in progress at a time.
-3. In Claude Code (Local, folder `v0-next-js-app-setup-1`), say: **"Read LIBRARY-BUILD-PROMPT.md and CLAUDE.md, then do Stage 1 only."**
+3. In Claude Code (Local, folder `texas-global-investments`), say: **"Read LIBRARY-BUILD-PROMPT.md and CLAUDE.md, then do Stage 1 only."**
 4. When a stage works in your browser, commit and push it, then say **"Library Stage 2"**, and so on.
 
 ---
